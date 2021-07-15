@@ -12,7 +12,7 @@
 
 const char test_title[] = "Test kfx";
 
-static struct xen_domctl op;
+static struct xen_sysctl cm;
 
 static inline void harness(unsigned int magic, void *a, size_t s)
 {
@@ -24,23 +24,18 @@ static inline void harness(unsigned int magic, void *a, size_t s)
 
 void test_main(void)
 {
-    int interface_version = xtf_probe_domctl_interface_version();
-    if ( interface_version < 0 )
-        return xtf_error("Failed to get domctl version\n");
+    int interface_version_sysctl = xtf_probe_sysctl_interface_version(); 
+    
+    if ( interface_version_sysctl < 0 )
+        return xtf_error("Failed to get sysctl version\n");
+    
+    printk("Sysctl version: %#x. Struct @ %p size %lu\n", interface_version_sysctl, &cm, sizeof(cm));
 
-    printk("Domctl version: %#x. Struct @ %p size %lu\n", interface_version, &op, sizeof(op));
+    harness(0x13371337, &cm, sizeof(cm));
 
-    harness(0x13371337, &op, sizeof(op));
-
-    op.cmd = XEN_DOMCTL_createdomain,
-    op.interface_version = interface_version;
-
-    int rc = hypercall_domctl(&op);
-    if ( rc == 0 )
-    {
-        op.cmd = XEN_DOMCTL_destroydomain;
-        hypercall_domctl(&op);
-    }
+    cm.cmd = XEN_SYSCTL_scheduler_op,
+    cm.interface_version = interface_version_sysctl;
+    hypercall_sysctl(&cm);
 
     harness(0x13371337, NULL, 0);
 

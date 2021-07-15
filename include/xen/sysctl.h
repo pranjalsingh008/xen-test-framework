@@ -29,7 +29,6 @@
 
 #include "xen.h"
 #include "physdev.h"
-
 /*
  * XEN_SYSCTL_LIVEPATCH_op
  *
@@ -187,12 +186,77 @@ struct xen_sysctl_livepatch_op {
 };
 typedef struct xen_sysctl_livepatch_op xen_sysctl_livepatch_op_t;
 
+#define ARINC653_MAX_DOMAINS_PER_SCHEDULE   64
+/*
+ * This structure is used to pass a new ARINC653 schedule from a
+ * privileged domain (ie dom0) to Xen.
+ */
+struct xen_sysctl_arinc653_schedule {
+    /* major_frame holds the time for the new schedule's major frame
+     * in nanoseconds. */
+    uint64_t __aligned(8)     major_frame;
+    /* num_sched_entries holds how many of the entries in the
+     * sched_entries[] array are valid. */
+    uint8_t     num_sched_entries;
+    /* The sched_entries array holds the actual schedule entries. */
+    struct {
+        /* dom_handle must match a domain's UUID */
+        uint8_t dom_handle[16];
+        /* If a domain has multiple VCPUs, vcpu_id specifies which one
+         * this schedule entry applies to. It should be set to 0 if
+         * there is only one VCPU for the domain. */
+        unsigned int vcpu_id;
+        /* runtime specifies the amount of time that should be allocated
+         * to this VCPU per major frame. It is specified in nanoseconds */
+        uint64_t __aligned(8) runtime;
+    } sched_entries[ARINC653_MAX_DOMAINS_PER_SCHEDULE];
+};
+typedef struct xen_sysctl_arinc653_schedule xen_sysctl_arinc653_schedule_t;
+
+#define XEN_SYSCTL_SCHED_RATELIMIT_MAX 500000
+#define XEN_SYSCTL_SCHED_RATELIMIT_MIN 100
+
+struct xen_sysctl_credit_schedule {
+    /* Length of timeslice in milliseconds */
+#define XEN_SYSCTL_CSCHED_TSLICE_MAX 1000
+#define XEN_SYSCTL_CSCHED_TSLICE_MIN 1
+    unsigned tslice_ms;
+    unsigned ratelimit_us;
+    /*
+     * How long we consider a vCPU to be cache-hot on the
+     * CPU where it has run (max 100ms, in microseconds)
+    */
+#define XEN_SYSCTL_CSCHED_MGR_DLY_MAX_US (100 * 1000)
+    unsigned vcpu_migr_delay_us;
+};
+
+struct xen_sysctl_credit2_schedule {
+    unsigned ratelimit_us;
+};
+
+#define XEN_SYSCTL_SCHEDOP_putinfo 0
+#define XEN_SYSCTL_SCHEDOP_getinfo 1
+struct xen_sysctl_scheduler_op {
+    uint32_t cpupool_id; /* Cpupool whose scheduler is to be targetted. */
+    uint32_t sched_id;   /* XEN_SCHEDULER_* (domctl.h) */
+    uint32_t cmd;        /* XEN_SYSCTL_SCHEDOP_* */
+    union {
+        xen_sysctl_arinc653_schedule_t *schedule;
+        uint64_t :64;
+        struct xen_sysctl_credit_schedule sched_credit;
+        struct xen_sysctl_credit2_schedule sched_credit2;
+    } u;
+};
+typedef struct xen_sysctl_scheduler_op xen_sysctl_scheduler_op_t;
+
 struct xen_sysctl {
     uint32_t cmd;
 #define XEN_SYSCTL_livepatch_op                  27
+#define XEN_SYSCTL_scheduler_op                  19
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
     union {
         struct xen_sysctl_livepatch_op      livepatch;
+        struct xen_sysctl_scheduler_op      scheduler_op;
         uint8_t                             pad[128];
     } u;
 };
