@@ -2,6 +2,12 @@ MAKEFLAGS += -rR
 ROOT := $(abspath $(CURDIR))
 export ROOT
 
+# Default to the all rule
+all:
+
+# Local settings and rules
+-include Makefile.local
+
 # $(xtfdir) defaults to $(ROOT) so development and testing can be done
 # straight out of the working tree.
 xtfdir  ?= $(ROOT)
@@ -42,13 +48,20 @@ INSTALL         := install
 INSTALL_DATA    := $(INSTALL) -m 644 -p
 INSTALL_DIR     := $(INSTALL) -d -p
 INSTALL_PROGRAM := $(INSTALL) -p
-PYTHON          := python
+
+# Best effort attempt to find a python interpreter, defaulting to Python 3 if
+# available.  Fall back to just `python` if `which` is nowhere to be found.
+PYTHON_INTERPRETER := $(word 1,$(shell which python3 python python2 2>/dev/null) python)
+PYTHON             ?= $(PYTHON_INTERPRETER)
 
 export CC LD CPP INSTALL INSTALL_DATA INSTALL_DIR INSTALL_PROGRAM OBJCOPY PYTHON
 
+# By default enable all the tests
+TESTS ?= $(wildcard $(ROOT)/tests/*)
+
 .PHONY: all
 all:
-	@set -e; for D in $(wildcard tests/*); do \
+	@set -e; for D in $(TESTS); do \
 		[ ! -e $$D/Makefile ] && continue; \
 		$(MAKE) -C $$D build; \
 	done
@@ -57,7 +70,7 @@ all:
 install:
 	@$(INSTALL_DIR) $(DESTDIR)$(xtfdir)
 	$(INSTALL_PROGRAM) xtf-runner $(DESTDIR)$(xtfdir)
-	@set -e; for D in $(wildcard tests/*); do \
+	@set -e; for D in $(TESTS); do \
 		[ ! -e $$D/Makefile ] && continue; \
 		$(MAKE) -C $$D install; \
 	done
@@ -93,5 +106,3 @@ doxygen: Doxyfile
 .PHONY: pylint
 pylint:
 	-pylint --rcfile=.pylintrc xtf-runner
-
--include Makefile.local

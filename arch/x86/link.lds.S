@@ -22,12 +22,12 @@ OUTPUT_ARCH(i386)
 # error Bad architecture to link with
 #endif
 
-ENTRY(_start)
+ENTRY(_elf_start)
 
 PHDRS
 {
-        /* Single loadable section, RWE. */
-        load PT_LOAD FLAGS(7);
+        text PT_LOAD FLAGS(7); /* RWE */
+        note PT_NOTE FLAGS(4); /* R   */
 }
 
 SECTIONS
@@ -37,6 +37,7 @@ SECTIONS
         _start = .;
 
         .text : {
+                *(.text.head)
                 *(.text)
 
 	. = ALIGN(PAGE_SIZE);
@@ -45,7 +46,7 @@ SECTIONS
 	. = ALIGN(PAGE_SIZE);
         __end_user_text = .;
 
-        } :load = 0
+        } :text = 0
 
         .data : {
                 *(.data)
@@ -60,6 +61,11 @@ SECTIONS
 
         }
 
+        .note : {
+                *(.note)
+                *(.note.*)
+        } :note :text
+
         .rodata : {
                 *(.rodata)
                 *(.rodata.*)
@@ -68,12 +74,7 @@ SECTIONS
         __start_ex_table = .;
                 *(.ex_table)
         __stop_ex_table = .;
-        }
-
-        .note : {
-                *(.note)
-                *(.note.*)
-        }
+        } :text
 
         .bss : {
                 *(.bss)
